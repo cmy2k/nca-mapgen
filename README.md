@@ -23,7 +23,7 @@ Example input:
 Output:
 A2-t2m-ave/  
 
-__temp/
+__ temp/  
 ____ A2-t2m-ave_180.csv  
 ____ A2-t2m-ave.vrt  
 ____ A2-t2m-ave__conus.shp  
