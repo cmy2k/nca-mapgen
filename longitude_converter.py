@@ -11,5 +11,7 @@ with open(output_name, 'wt') as file_out:
         writer.writeheader()
         reader.next()
         for row in reader:
-            row['LON'] = float(row['LON']) - 180
+            lon = float(row['LON'])
+            if lon >= 180:
+                row['LON'] = lon - 360
             writer.writerow(row)

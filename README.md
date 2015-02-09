@@ -28,50 +28,49 @@ Example input:
 Output:
 A2-t2m-ave/
 
-__ P2021_2050/
-____ data/
-______ A2-t2m-ave__P2021_2050.tif
-______ A2-t2m-ave__P2021_2050__conus.tif
-______ A2-t2m-ave__P2021_2050__hi.tif
-______ A2-t2m-ave__P2021_2050__hi_buffer.tif
-______ A2-t2m-ave__P2021_2050__ak.tif
-______ A2-t2m-ave__P2021_2050__ak_buffer.tif
-____ renders/
-______ A2-t2m-ave__P2021_2050__conus.png
-______ A2-t2m-ave__P2021_2050__hi.png
-______ A2-t2m-ave__P2021_2050__hi_buffer.png
-______ A2-t2m-ave__P2021_2050__ak.png
-______ A2-t2m-ave__P2021_2050__ak_buffer.png
+__ P2021_2050/ 
+____ data/ 
+______ A2-t2m-ave__P2021_2050.tif 
+______ A2-t2m-ave__P2021_2050__conus.tif 
+______ A2-t2m-ave__P2021_2050__hi.tif 
+______ A2-t2m-ave__P2021_2050__hi_buffer.tif 
+______ A2-t2m-ave__P2021_2050__ak.tif 
+______ A2-t2m-ave__P2021_2050__ak_buffer.tif 
+____ renders/ 
+______ A2-t2m-ave__P2021_2050__conus.png 
+______ A2-t2m-ave__P2021_2050__hi.png 
+______ A2-t2m-ave__P2021_2050__hi_buffer.png 
+______ A2-t2m-ave__P2021_2050__ak.png 
+______ A2-t2m-ave__P2021_2050__ak_buffer.png 
+__ P2041_2070/ 
+____ data/ 
+______ A2-t2m-ave__P2041_2070.tif 
+______ A2-t2m-ave__P2041_2070__conus.tif 
+______ A2-t2m-ave__P2041_2070__hi.tif 
+______ A2-t2m-ave__P2041_2070__hi_buffer.tif 
+______ A2-t2m-ave__P2041_2070__ak.tif 
+______ A2-t2m-ave__P2041_2070__ak_buffer.tif 
+____ renders/ 
+______ A2-t2m-ave__P2041_2070__conus.png 
+______ A2-t2m-ave__P2041_2070__hi.png 
+______ A2-t2m-ave__P2041_2070__hi_bu7fer.png 
+______ A2-t2m-ave__P2041_2070__ak.png 
+______ A2-t2m-ave__P2041_2070__ak_buffer.png 
 
-__ P2041_2070/
-____ data/
-______ A2-t2m-ave__P2041_2070.tif
-______ A2-t2m-ave__P2041_2070__conus.tif
-______ A2-t2m-ave__P2041_2070__hi.tif
-______ A2-t2m-ave__P2041_2070__hi_buffer.tif
-______ A2-t2m-ave__P2041_2070__ak.tif
-______ A2-t2m-ave__P2041_2070__ak_buffer.tif
-____ renders/
-______ A2-t2m-ave__P2041_2070__conus.png
-______ A2-t2m-ave__P2041_2070__hi.png
-______ A2-t2m-ave__P2041_2070__hi_bu7fer.png
-______ A2-t2m-ave__P2041_2070__ak.png
-______ A2-t2m-ave__P2041_2070__ak_buffer.png
-
-__ P2070_2099/
-____ data/
-______ A2-t2m-ave__P2070_2099.tif
-______ A2-t2m-ave__P2070_2099__conus.tif
-______ A2-t2m-ave__P2070_2099__hi.tif
-______ A2-t2m-ave__P2070_2099__hi_buffer.tif
-______ A2-t2m-ave__P2070_2099__ak.tif
-______ A2-t2m-ave__P2070_2099__ak_buffer.tif
-____ renders/
-______ A2-t2m-ave__P2070_2099__conus.png
-______ A2-t2m-ave__P2070_2099__hi.png
-______ A2-t2m-ave__P2070_2099__hi_buffer.png
-______ A2-t2m-ave__P2070_2099__ak.png
-______ A2-t2m-ave__P2070_2099__ak_buffer.png
+__ P2070_2099/ 
+____ data/ 
+______ A2-t2m-ave__P2070_2099.tif 
+______ A2-t2m-ave__P2070_2099__conus.tif 
+______ A2-t2m-ave__P2070_2099__hi.tif 
+______ A2-t2m-ave__P2070_2099__hi_buffer.tif 
+______ A2-t2m-ave__P2070_2099__ak.tif 
+______ A2-t2m-ave__P2070_2099__ak_buffer.tif 
+____ renders/ 
+______ A2-t2m-ave__P2070_2099__conus.png 
+______ A2-t2m-ave__P2070_2099__hi.png 
+______ A2-t2m-ave__P2070_2099__hi_buffer.png 
+______ A2-t2m-ave__P2070_2099__ak.png 
+______ A2-t2m-ave__P2070_2099__ak_buffer.png 
 
 ### 1: Subtract 180 from all longitudes
 The source data has longitudes ranging from 0 to 360. It is more common for WGS84 data to be presented in a range of -180 to 180. To make processing easier later, all rows are looped over, and each longitude value is subtracted by 180.
