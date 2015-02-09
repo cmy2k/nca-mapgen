@@ -1,0 +1,22 @@
+{
+  "source": {
+    "path": "A2-t2m-ave.csv",
+    "xres": 2.8125,
+    "yres": 2.79,
+    "0_360": true,
+    "fields": [
+    {
+        "data": "P2021_2050",
+        "stat": "Stat_sig_50"
+      }, {
+        "data": "P2041_2070",
+        "stat": "Stat_sig_70"
+      }, {
+        "data": "P2070_2099",
+        "stat": "Stat_sig_99"
+      }
+    ]
+  },
+  "features_dir": "boundaries/",
+  "map_template": "A2-t2m-ave.map.tpl"
+}

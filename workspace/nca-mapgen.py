@@ -51,6 +51,7 @@ def write_vrt(base, fields):
     return output_path
 
 def extract_extents(features_dir, vrt_path):
+    outfiles = []
     features_files = glob.glob('%s*.shp' % features_dir)
     driver = ogr.GetDriverByName('ESRI Shapefile')
     for features_file in features_files:
@@ -62,6 +63,7 @@ def extract_extents(features_dir, vrt_path):
 
         fportion = os.path.splitext(os.path.basename(features_file))[0]
         out_file = '%s__%s.shp' % (os.path.splitext(vrt_path)[0], fportion)
+        outfiles.append(out_file)
 
         subprocess.call([
             'ogr2ogr',
@@ -74,6 +76,29 @@ def extract_extents(features_dir, vrt_path):
             out_file,
             vrt_path
         ])
+
+    return outfiles
+
+def generate_rasters(base, outfiles, fields, xres, yres):
+    output_base = '%s/data/' % base
+    for outfile in outfiles:
+        out_name = os.path.splitext(os.path.basename(outfile))[0]
+        for field in fields:
+            out_file = '%s%s__%s.tif' % (output_base, out_name, field['data'])
+            args = [
+                'gdal_rasterize',
+                '-tr',
+                str(xres),
+                str(yres),
+                '-l',
+                out_name,
+                '-a',
+                field['data'],
+                outfile,
+                out_file
+            ]
+            
+            subprocess.call(args)
 
 #
 # Main
@@ -103,4 +128,7 @@ if config['source']['0_360']:
 vrt_path = write_vrt(base, config['source']['fields'])
 
 # write out all extent shapefiles
-extract_extents(config['features_dir'], vrt_path)
+outfiles = extract_extents(config['features_dir'], vrt_path)
+
+# create rasters for each extent shapefile
+generate_rasters(base, outfiles, config['source']['fields'], config['source']['xres'], config['source']['yres'])
