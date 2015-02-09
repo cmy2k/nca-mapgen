@@ -8,82 +8,83 @@ Arguments:
 - Input CSV
 - List of raster columns
 - List of stats columns
-- Pixel resolution
+- Pixel resolution X,Y
 - Path to directory of clip shapes
 - Mapfile path (can contain references to other map elements)
 
 Example input:
 - A2-t2m-ave.csv
-- P2021_2050,P2041_2070,P2070_2099
-- Stat_sig_50,Stat_sig_70,Stat_sig_99
-- 2.8
-- clips/
--- conus.shp
--- hi.shp
--- hi_buffer.shp
--- ak.shp
--- ak_buffer.shp
-- A2-t2m-ave.map.tpl
+- boundaries/  
+  - conus.shp
+  - hi.shp
+  - ak.shp
+- config.json
+```json
+{
+  'layers': [
+    {
+      'data': 'P2021_2050',
+      'stat': 'Stat_sig_50'
+    }, {
+      'data': 'P2041_2070',
+      'stat': 'Stat_sig_70'
+    }, {
+      'data': 'P2070_2099',
+      'stat': 'Stat_sig_99'
+    }    
+  ],
+  'template': A2-t2m-ave.map.tpl,
+  'xres': 2.8125,
+  'yres': 2.79
+}
+```
 
 Output:
-A2-t2m-ave/
+A2-t2m-ave/  
 
-__ P2021_2050/  
-____ data/  
-______ A2-t2m-ave__P2021_2050.tif  
-______ A2-t2m-ave__P2021_2050__conus.tif  
-______ A2-t2m-ave__P2021_2050__hi.tif  
-______ A2-t2m-ave__P2021_2050__hi_buffer.tif  
-______ A2-t2m-ave__P2021_2050__ak.tif  
-______ A2-t2m-ave__P2021_2050__ak_buffer.tif  
-____ renders/  
-______ A2-t2m-ave__P2021_2050__conus.png  
-______ A2-t2m-ave__P2021_2050__hi.png  
-______ A2-t2m-ave__P2021_2050__hi_buffer.png  
-______ A2-t2m-ave__P2021_2050__ak.png  
-______ A2-t2m-ave__P2021_2050__ak_buffer.png  
+__temp/
+____ A2-t2m-ave_180.csv  
+____ A2-t2m-ave.vrt  
+____ A2-t2m-ave__conus.shp  
+____ A2-t2m-ave__hi.shp  
+____ A2-t2m-ave__ak.shp  
 
-__ P2041_2070/  
-____ data/  
-______ A2-t2m-ave__P2041_2070.tif  
-______ A2-t2m-ave__P2041_2070__conus.tif  
-______ A2-t2m-ave__P2041_2070__hi.tif  
-______ A2-t2m-ave__P2041_2070__hi_buffer.tif  
-______ A2-t2m-ave__P2041_2070__ak.tif  
-______ A2-t2m-ave__P2041_2070__ak_buffer.tif  
-____ renders/  
-______ A2-t2m-ave__P2041_2070__conus.png  
-______ A2-t2m-ave__P2041_2070__hi.png  
-______ A2-t2m-ave__P2041_2070__hi_bu7fer.png  
-______ A2-t2m-ave__P2041_2070__ak.png  
-______ A2-t2m-ave__P2041_2070__ak_buffer.png  
+__ data/  
+____ A2-t2m-ave__P2021_2050__conus.tif  
+____ A2-t2m-ave__P2021_2050__hi.tif  
+____ A2-t2m-ave__P2021_2050__ak.tif  
+____ A2-t2m-ave__P2041_2070__conus.tif  
+____ A2-t2m-ave__P2041_2070__hi.tif  
+____ A2-t2m-ave__P2041_2070__ak.tif  
+____ A2-t2m-ave__P2070_2099__conus.tif  
+____ A2-t2m-ave__P2070_2099__hi.tif  
+____ A2-t2m-ave__P2070_2099__ak.tif  
 
-__ P2070_2099/  
-____ data/  
-______ A2-t2m-ave__P2070_2099.tif  
-______ A2-t2m-ave__P2070_2099__conus.tif  
-______ A2-t2m-ave__P2070_2099__hi.tif  
-______ A2-t2m-ave__P2070_2099__hi_buffer.tif  
-______ A2-t2m-ave__P2070_2099__ak.tif  
-______ A2-t2m-ave__P2070_2099__ak_buffer.tif  
-____ renders/  
-______ A2-t2m-ave__P2070_2099__conus.png  
-______ A2-t2m-ave__P2070_2099__hi.png  
-______ A2-t2m-ave__P2070_2099__hi_buffer.png  
-______ A2-t2m-ave__P2070_2099__ak.png  
-______ A2-t2m-ave__P2070_2099__ak_buffer.png  
+__ renders/  
+____ A2-t2m-ave__P2021_2050__conus.png  
+____ A2-t2m-ave__P2021_2050__hi.png  
+____ A2-t2m-ave__P2021_2050__ak.png  
+____ A2-t2m-ave__P2041_2070__conus.png  
+____ A2-t2m-ave__P2041_2070__hi.png  
+____ A2-t2m-ave__P2041_2070__ak.png  
+____ A2-t2m-ave__P2070_2099__conus.png  
+____ A2-t2m-ave__P2070_2099__hi.png  
+____ A2-t2m-ave__P2070_2099__ak.png  
 
-### 1: Subtract 180 from all longitudes
+Note:  
+Generally, the process of rasterize, then clip, is that there's some odd things that happen to the outputs. They don't quite line up with the original, and this is potentially very problematic with the data representation.
+
+### 0 (if necessary): Subtract 180 from all longitudes
 The source data has longitudes ranging from 0 to 360. It is more common for WGS84 data to be presented in a range of -180 to 180. To make processing easier later, all rows are looped over, and each longitude value is subtracted by 180.
 
-### 2: Column arg, generate VRT to wrap CSV
-Assuming A2-t2m-ave.csv with data columns: P2021_2050, P2041_2070, P2070_2099
+### 1: Column arg, generate VRT to wrap CSV
+Assuming A2-t2m-ave.csv (or derived from step 0: A2-t2m-ave.csv) with data columns: P2021_2050, P2041_2070, P2070_2099
 
 A2-t2m-ave.vrt
 ```xml
 <OGRVRTDataSource>
   <OGRVRTLayer name="A2-t2m-ave">
-    <SrcDataSource relativeToVRT="1">A2-t2m-ave.csv</SrcDataSource>
+    <SrcDataSource relativeToVRT="1">A2-t2m-ave_180.csv</SrcDataSource>
     <GeometryType>wkbPoint</GeometryType>
     <LayerSRS>WGS84</LayerSRS>
     <GeometryField encoding="PointFromColumns" x="LON" y="LAT" />
@@ -94,16 +95,25 @@ A2-t2m-ave.vrt
 </OGRVRTDataSource>
 ```
 
-### 3: gdal_rasterize on each layer of the VRT
+### 3: Find extent of each clip boundary
+Attempting to clip the vrt using ogr2ogr -clipsrc with a shapefile specified is _very_ slow. I think a better procedure will be to get general boxes for the features, then clip to those. This is incredibly faster, plus it gives some spillover around the shape which is desirable.
 
-gdal_rasterize -tr 2.8 2.8 -l A2-t2m-ave -a P2021_2050 A2-t2m-ave.vrt A2-t2m-ave__P2021_2050.tif
+Do this for every clip:
+```
+ogrinfo -so input/boundaries/conus.shp conus | grep "Extent: "
+-->> Extent: (-124.848974, 24.396308) - (-66.885444, 49.384358)
+```
 
-This creates an unstyled global raster
+Then:
+```
+ogr2ogr -clipsrc -124.848974 24.396308 -66.885444 49.384358  A2-t2m-ave/temp/A2-t2m-ave__conus.shp A2-t2m-ave/temp/A2-t2m-ave.vrt
+```
 
-### 4: wrap raster around Prime Meridian
-The input data set has longitudes ranging from 0-360, but -180-180 are more typical. As such, the raster is processed with the following step:
+### 4: gdal_rasterize on each column of each extent shapefile
+gdal_rasterize -tr 2.8125 2.79 -l A2-t2m-ave__conus -a P2021_2050 A2-t2m-ave/temp/A2-t2m-ave__conus.shp A2-t2m-ave/data/A2-t2m-ave__P2021_2050__conus.tif
 
-gdalwarp -t_srs WGS84 /Users/cmy2k/Documents/src/nemac/nca/foo.tif /Users/cmy2k/Documents/src/nemac/nca/foo2.tif -wo SOURCE_EXTRA=1000 --config CENTER_LONG 0
+This creates unstyled rasters for each extent and attribute combination.
 
-### 3: Clip out global raster
-
+### TODO:
+- How to handle significance?
+- Style rasters
