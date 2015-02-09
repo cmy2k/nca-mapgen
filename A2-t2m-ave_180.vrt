@@ -1,0 +1,11 @@
+<OGRVRTDataSource>
+  <OGRVRTLayer name="A2-t2m-ave_180">
+    <SrcDataSource relativeToVRT="1">A2-t2m-ave_180.csv</SrcDataSource>
+    <GeometryType>wkbPoint</GeometryType>
+    <LayerSRS>WGS84</LayerSRS>
+    <GeometryField encoding="PointFromColumns" x="LON" y="LAT" />
+    <Field name="P2021_2050" src="P2021_2050" type="Real" />
+    <Field name="P2041_2070" src="P2041_2070" type="Real" />
+    <Field name="P2070_2099" src="P2070_2099" type="Real" />
+  </OGRVRTLayer>
+</OGRVRTDataSource>
