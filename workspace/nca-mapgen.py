@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import json, os, csv, glob, subprocess
 from osgeo import ogr
 

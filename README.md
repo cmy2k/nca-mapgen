@@ -1,7 +1,76 @@
 # nca-mapgen
 Scripts to help automate generating map images from model data provided by NCA
 
-## Thoughts
+## Prerequisites
+- gdal/ogr
+- gdal/ogr python bindings
+
+## Usage
+Expects the following arrangement within a directory:
+- nca-mapgen.py
+- input.csv
+- boundaries_dir/
+- config.json
+
+See workspace/config.json for example config. The elements are as follows:
+- source: object of attributes describing the input CSV
+  - path: relative path to csv file
+  - xres: x-axis resolution to be used during rasterizing
+  - yres: y-axis resolution to be used during rasterizing
+  - 0_360: boolean to indicate if the input dataset spans from 0 to 360 instead of -180 to 180 as is typical for WGS84. If true, the input values with longitudes of 180 or more will be subtracted by 360. This moves the values to the west of the Prime Meridian and corrects the dataset to be within the range of -180 to 180.
+  - fields: this is an array of data/stat pairs to describe the CSV attribute columns that should be turned into new datasets. Each is an object that follows this pattern:
+    - data: column name a data column. This will be the basis of one of the boundary rasters.
+    - stat: the statistical significance column that will be used as an overlay in the map composition. This needs to be paired with the data column so that it's clear what stat column goes with what data column in the output map composition.
+
+- features_dir: path to all the boundary shapefiles. The extent of each will be used as the basis for an output raster. The features can be multipart - the full extent of all data within will be used for CSV datapoint extraction.
+- map_template: base template for styling the map compositions.
+    
+
+To run (assuming *nix with chmod +x):
+```
+./nca-mapgen.py
+```
+
+Otherwise:  
+```
+python nca-mapgen.py
+```
+
+## Outputs
+A new dir will be created relative to the script location. It will take the base name of the input.csv. Additionally, the script will generate files for every permutation of boundaries and attributes. So for example:
+
+input.csv has:  
+- attribute-a
+- attribute-b
+
+and in boundaries_dir/  
+- boundary-1.shp
+- boundary-2.shp
+
+outputs will be generated as such:
+- input__boundary-1__attribute-a
+- input__boundary-1__attribute-b
+- input__boundary-2__attribute-a
+- input__boundary-2__attribute-b
+
+The output is arranged into several subdirectories within the output dir. They include:
+- data: this is where the generated rasters go for each CSV attribute/boundary permutation
+- renders: this is where the actual map composition images are output
+- temp: inclues several intermediate vector products to help generate the rasters
+
+## TODO
+### Features
+- How to handle significance?
+- Render map compositions
+
+### Enhancements
+- actually follow some practices in the code / modularize :]
+- auto-populate fieldnames in CSV parsing
+- parameterize path to config.json as a command-line arg
+
+- - -
+
+## Development notes
 The following are some thoughts on how this might be approached.
 
 Arguments:
@@ -95,6 +164,3 @@ gdal_rasterize -tr 2.8125 2.79 -l A2-t2m-ave__conus -a P2021_2050 A2-t2m-ave/tem
 
 This creates unstyled rasters for each extent and attribute combination.
 
-### TODO:
-- How to handle significance?
-- Style rasters
