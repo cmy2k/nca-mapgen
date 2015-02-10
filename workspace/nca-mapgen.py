@@ -81,11 +81,13 @@ def extract_extents(features_dir, vrt_path):
     return outfiles
 
 def generate_rasters(base, outfiles, fields, xres, yres):
+    out_rasters = []
     output_base = '%s/data/' % base
     for outfile in outfiles:
         out_name = os.path.splitext(os.path.basename(outfile))[0]
         for field in fields:
             out_file = '%s%s__%s.tif' % (output_base, out_name, field['data'])
+            out_rasters.append(out_file)
             args = [
                 'gdal_rasterize',
                 '-tr',
@@ -100,6 +102,50 @@ def generate_rasters(base, outfiles, fields, xres, yres):
             ]
             
             subprocess.call(args)
+    return out_rasters
+
+def build_mapfile(base, template, outfiles):
+    layerbase =  '''
+  LAYER
+    NAME "%s"
+    DATA "%s"
+    INCLUDE "classes.cmap"
+    MASK "mask"
+  END
+'''
+
+    layers = []
+    for outfile in outfiles:
+        out_name = os.path.splitext(os.path.basename(outfile))[0]
+        full_path = os.path.abspath(outfile)
+        layers.append(layerbase % (out_name, full_path))
+
+    out_map = '%s/%s.map' % (os.path.dirname(template), base)
+
+    with open(out_map, 'wt') as file_out:
+        with open(template, 'rb') as file_in:
+            replaced = file_in.read().replace('$$LAYERS$$', ''.join(layers))
+            file_out.write(replaced)
+
+    return out_map
+
+def render_images(base, mapfile, out_rasters):
+    output_base = '%s/renders/' % base
+    for out_raster in out_rasters:
+        out_name = os.path.splitext(os.path.basename(out_raster))[0]
+        render_file = '%s%s.png' % (output_base, out_name)
+        
+        bbox=str('-125.16,24.42,-66,49.53.5')
+
+        query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:4326&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
+
+        os.putenv('REQUEST_METHOD', 'GET')
+        os.putenv('QUERY_STRING', query_string)
+
+        p1 = subprocess.Popen(['./mapserv-6.4.1-CentOS-7.exe'], stdout=subprocess.PIPE)
+        with open(render_file, 'w') as out:
+            p2 = subprocess.Popen(['sed', '1,/^\r\{0,1\}$/d'], stdin=p1.stdout, stdout=out)
+        
 
 #
 # Main
@@ -129,7 +175,11 @@ if config['source']['0_360']:
 vrt_path = write_vrt(base, config['source']['fields'])
 
 # write out all extent shapefiles
-outfiles = extract_extents(config['features_dir'], vrt_path)
+out_shps = extract_extents(config['features_dir'], vrt_path)
 
 # create rasters for each extent shapefile
-generate_rasters(base, outfiles, config['source']['fields'], config['source']['xres'], config['source']['yres'])
+out_rasters = generate_rasters(base, out_shps, config['source']['fields'], config['source']['xres'], config['source']['yres'])
+
+mapfile = build_mapfile(base, config['map_template'], out_rasters)
+
+render_images(base, mapfile, out_rasters)

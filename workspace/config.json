@@ -17,6 +17,6 @@
       }
     ]
   },
-  "features_dir": "boundaries/",
-  "map_template": "A2-t2m-ave.map.tpl"
+  "features_dir": "input/boundaries/",
+  "map_template": "input/mapdata/nca.map.tpl"
 }
