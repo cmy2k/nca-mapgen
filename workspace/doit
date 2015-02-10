@@ -1,8 +1,0 @@
-#! /bin/bash
-
-export REQUEST_METHOD='GET'
-export QUERY_STRING='TRANSPARENT=true&LAYERS=conusmask,test,states&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image%2Fpng&SRS=EPSG%3A4326&BBOX=-125.16,24.42,-66,49.53.5&WIDTH=800&HEIGHT=400&map=test.map'
-
-#minx,miny,maxx,maxy
-
-../../mapserv-6.4.1-CentOS-7.exe | sed '1,/^\r\{0,1\}$/d'
