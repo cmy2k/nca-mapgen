@@ -1,8 +1,8 @@
 {
   "source": {
-    "path": "A2-t2m-ave.csv",
-    "xres": 2.8125,
-    "yres": 2.79,
+    "path": "input/P_RCP_26.csv",
+    "xres": 1.5,
+    "yres": 1.5,
     "0_360": true,
     "fields": [
     {

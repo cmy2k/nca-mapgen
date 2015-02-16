@@ -14,18 +14,6 @@ MAP
     END
   END
 
-  LAYER
-    NAME "mask"
-    DATA "../boundaries/CONUS_4326.shp"
-    STATUS OFF
-    TYPE POLYGON
-    CLASS
-      STYLE
-        COLOR 255 255 255
-      END
-    END
-  END
-
   $$LAYERS$$
 
   LAYER

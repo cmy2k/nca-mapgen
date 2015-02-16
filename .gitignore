@@ -1,2 +1,13 @@
 *~
 .DS_STORE
+workspace/input/boundaries/
+workspace/input/newdata/
+workspace/input/olddata/
+*.exe
+*_bak
+*.cpg
+*.dbf
+*.prj
+*.qpj
+*.shp
+*.shx
