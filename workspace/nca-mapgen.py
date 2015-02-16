@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import json, os, csv, glob, subprocess, shutil
+import json, os, csv, glob, subprocess, shutil 
+from itertools import product
 from osgeo import ogr
 
 ##
@@ -9,7 +10,71 @@ def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path);
 
-def correct_meridian(input_csv, output_csv):
+def filename(base, dr, ext):
+    return os.path.join(base, dr, '%s.%s' % (base, ext))
+
+def get_extent(layer):
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+    data_source = driver.Open(layer, 0)
+    layer = data_source.GetLayer()
+    extent = list(layer.GetExtent())
+    # correct coordinate bbox coordinate order to conform with the rest of everything
+    extent[2], extent[1] = extent[1], extent[2]
+    return extent
+
+# This funciton goes ahead and figures out all the 
+# file output details in one place. Some advantages
+#  1: one place handles all the string concatenation
+#     etc, so methods are much more focused on the
+#     business logic and have simpler method signitures
+#  2: elements can be calculated in groups more simply
+#     so that related things (like a boundary file and
+#     the various rasters it is associated with) can
+#     be grouped much more simply, even if they are
+#     generated in several places
+def map_output_files(base, features_dir, fields, map_template):
+    output_map = {
+        'dirs': {
+            'base': base,
+            'temp': os.path.join(base, 'temp'),
+            'data': os.path.join(base, 'data'),
+            'renders': os.path.join(base, 'renders')
+        },
+        'csv': filename(base, 'temp', 'csv'),
+        'vrt': filename(base, 'temp', 'vrt'),
+        'map_file': os.path.join(os.path.dirname(map_template), '%s.map' % base),
+        'geo_files': {}
+    }
+
+    # build list of boundary files
+    boundary_files = glob.glob('%s*.shp' % features_dir)
+
+    for boundary_file in boundary_files:
+        boundary_name = os.path.splitext(os.path.basename(boundary_file))[0]
+        base_boundary_portion = '%s__%s' % (base, boundary_name)
+
+        output_map['geo_files'][boundary_name] = {
+            'boundary_file': boundary_file,
+            'boundary_file_name': boundary_name,
+            'points_file': os.path.join(output_map['dirs']['temp'], '%s.shp' % base_boundary_portion),
+            'points_layer_name': base_boundary_portion,
+            'extent': get_extent(boundary_file),
+            'rasters': []
+        }
+
+        for field in fields:
+            raster_layer_name = '%s__%s' % (base_boundary_portion, field['data'])
+            output_map['geo_files'][boundary_name]['rasters'].append({
+                'field': field['data'],
+                'grid_layer_name': raster_layer_name,
+                'grid_file': os.path.join(output_map['dirs']['data'], '%s.tif' % raster_layer_name),
+                'render_file': os.path.join(output_map['dirs']['renders'], '%s.png' % raster_layer_name),
+            })
+
+    return output_map
+
+## Corrects 0 to 360 longitudes to -180 to 180, writes new CSV
+def write_corrected_csv(input_csv, output_csv):
     with open(input_csv, 'rb') as file_in:
         with open(output_csv, 'wt') as file_out:
             # auto-populate headers based on the first row of the CSV input
@@ -25,7 +90,7 @@ def correct_meridian(input_csv, output_csv):
                     row['LON'] = lon - 360
                 writer.writerow(row)
 
-def write_vrt(base, fields):
+def write_vrt(base, fields, vrt_path):
     field_template = '    <Field name="{0}" src="{0}" type="Real" />'
     field_arr = []
 
@@ -44,112 +109,91 @@ def write_vrt(base, fields):
 </OGRVRTDataSource>
 '''.format(base, '\n'.join(field_arr))
 
-    output_path = '{0}/temp/{0}.vrt'.format(base)
-    with open(output_path, 'wt') as file_out:
+    with open(vrt_path, 'wt') as file_out:
         file_out.write(vrt)
 
-    return output_path
-
-def get_extent(layer):
-    driver = ogr.GetDriverByName('ESRI Shapefile')
-    data_source = driver.Open(layer, 0)
-    layer = data_source.GetLayer()
-    return layer.GetExtent()
-
-def extract_boundary_points(features_dir, vrt_path):
-    outfiles = []
-    features_files = glob.glob('%s*.shp' % features_dir)
-
-    for features_file in features_files:
-        extent = get_extent(features_file)
-
-        fportion = os.path.splitext(os.path.basename(features_file))[0]
-        out_file = '%s__%s.shp' % (os.path.splitext(vrt_path)[0], fportion)
-        outfiles.append(out_file)
-
+def extract_boundary_points(boundaries, vrt_path):
+    for boundary in boundaries.values():
         subprocess.call([
             'ogr2ogr',
             '-overwrite',
             '-clipsrc',
-            str(extent[0]),
-            str(extent[2]),
-            str(extent[1]),
-            str(extent[3]),
-            out_file,
+            str(boundary['extent'][0]),
+            str(boundary['extent'][1]),
+            str(boundary['extent'][2]),
+            str(boundary['extent'][3]),
+            boundary['points_file'],
             vrt_path
         ], stdout=open(os.devnull, 'wb')) #, stderr=open(os.devnull, 'wb')
 
-    return outfiles
-
-def generate_rasters(base, outfiles, fields, xres, yres):
-    out_rasters = []
-    output_base = '%s/data/' % base
-    for outfile in outfiles:
-        out_name = os.path.splitext(os.path.basename(outfile))[0]
-        for field in fields:
-            out_file = '%s%s__%s.tif' % (output_base, out_name, field['data'])
-            out_rasters.append(out_file)
+def generate_rasters(geo_files, xres, yres):
+    for geo_file in geo_files:
+        for raster in geo_file['rasters']:
             args = [
                 'gdal_rasterize',
                 '-tr',
                 str(xres),
                 str(yres),
                 '-l',
-                out_name,
+                geo_file['points_layer_name'],
                 '-a',
-                field['data'],
-                outfile,
-                out_file
+                raster['field'],
+                geo_file['points_file'],
+                raster['grid_file']
             ]
             
             subprocess.call(args) #, stdout=open(os.devnull, 'wb')
-    return out_rasters
 
-def build_mapfile(base, template, outfiles):
-    layerbase =  '''
+def build_mapfile(geo_files, template_map, output_map):
+    mask_base = '''
+  LAYER
+    NAME "%s_mask"
+    DATA "%s"
+    STATUS OFF
+    TYPE POLYGON
+    CLASS
+      STYLE
+        COLOR 255 255 255
+      END
+    END
+  END
+'''
+
+    layer_base =  '''
   LAYER
     NAME "%s"
     DATA "%s"
     INCLUDE "classes.cmap"
-    MASK "mask"
+    MASK "%s_mask"
   END
 '''
 
     layers = []
-    for outfile in outfiles:
-        out_name = os.path.splitext(os.path.basename(outfile))[0]
-        full_path = os.path.abspath(outfile)
-        layers.append(layerbase % (out_name, full_path))
+    for geo_file in geo_files:
+        mask_name = geo_file['boundary_file_name']
+        layers.append(mask_base % (mask_name, os.path.abspath(geo_file['boundary_file'])))
+        
+        for raster in geo_file['rasters']:
+            layers.append(layer_base % (raster['grid_layer_name'], os.path.abspath(raster['grid_file']), mask_name))
 
-    out_map = '%s/%s.map' % (os.path.dirname(template), base)
-
-    with open(out_map, 'wt') as file_out:
-        with open(template, 'rb') as file_in:
+    with open(output_map, 'wt') as file_out:
+        with open(template_map, 'rb') as file_in:
             replaced = file_in.read().replace('$$LAYERS$$', ''.join(layers))
             file_out.write(replaced)
 
-    return out_map
-
-def render_images(base, mapfile, out_rasters):
-    output_base = '%s/renders/' % base
-    for out_raster in out_rasters:
-        out_name = os.path.splitext(os.path.basename(out_raster))[0]
-        render_file = '%s%s.png' % (output_base, out_name)
-        
-        bbox=str('-125.16,24.42,-66,49.53.5')
+def render_images(mapfile, geo_files):
+    os.putenv('REQUEST_METHOD', 'GET')
+    for geo_file in geo_files:
+        bbox = ','.join(map(str,geo_file['extent']))
         #bbox=str('-2235805.8,-1693186.6,2126321.7,1328674.6')
-
-        query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:4326&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
-
         #query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:9822&UNITS=m&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
+        for raster in geo_file['rasters']:
+            query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:4326&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=%s_mask,%s,states&BBOX=%s' % (mapfile, geo_file['boundary_file_name'], raster['grid_layer_name'], bbox)
+            os.putenv('QUERY_STRING', query_string)
 
-        os.putenv('REQUEST_METHOD', 'GET')
-        os.putenv('QUERY_STRING', query_string)
-
-        p1 = subprocess.Popen(['./mapserv-6.4.1-CentOS-7.exe'], stdout=subprocess.PIPE)
-        with open(render_file, 'w') as out:
-            p2 = subprocess.Popen(['sed', '1,/^\r\{0,1\}$/d'], stdin=p1.stdout, stdout=out)
-        
+            p1 = subprocess.Popen(['./mapserv-6.4.1-CentOS-7.exe'], stdout=subprocess.PIPE)
+            with open(raster['render_file'], 'w') as out:
+                p2 = subprocess.Popen(['sed', '1,/^\r\{0,1\}$/d'], stdin=p1.stdout, stdout=out)
 
 #
 # Main
@@ -160,35 +204,31 @@ config_file = open('config.json')
 config = json.load(config_file)
 config_file.close()
 
-# make output structure
-base = os.path.splitext(os.path.basename(config['source']['path']))[0]
-temp_dir = os.path.join(base, 'temp')
-data_dir = os.path.join(base, 'data')
-renders_dir = os.path.join(base, 'renders')
+base_name = os.path.splitext(os.path.basename(config['source']['path']))[0]
 
-mkdir(base)
-mkdir(temp_dir)
-mkdir(data_dir)
-mkdir(renders_dir)
+# create full intended output
+output_files_map = map_output_files(base_name, config['features_dir'], config['source']['fields'], config['map_template'])
+
+# make output structure
+for outdir in output_files_map['dirs'].values():
+    mkdir(outdir)
 
 # correct meridian
-csv_dest = os.path.join(base, 'temp', '%s.csv' % base)
 if config['source']['0_360']:
-    correct_meridian(config['source']['path'], csv_dest)
+    write_corrected_csv(config['source']['path'], output_files_map['csv'])
 else:
-    shutil.copyfile(config['source']['path'], csv_dest)
+    shutil.copyfile(config['source']['path'], output_files_map['csv'])
 
-'''
 # generate vrt
-vrt_path = write_vrt(base, config['source']['fields'])
+write_vrt(base_name, config['source']['fields'], output_files_map['vrt'])
 
 # write out all extent shapefiles
-out_shps = extract_boundary_points(config['features_dir'], vrt_path)
+extract_boundary_points(output_files_map['geo_files'], output_files_map['vrt'])
 
 # create rasters for each extent shapefile
-out_rasters = generate_rasters(base, out_shps, config['source']['fields'], config['source']['xres'], config['source']['yres'])
+generate_rasters(output_files_map['geo_files'].values(), config['source']['xres'], config['source']['yres'])
 
-mapfile = build_mapfile(base, config['map_template'], out_rasters)
+build_mapfile(output_files_map['geo_files'].values(), config['map_template'], output_files_map['map_file'])
 
-render_images(base, mapfile, out_rasters)
-'''
+render_images(output_files_map['map_file'], output_files_map['geo_files'].values())
+
