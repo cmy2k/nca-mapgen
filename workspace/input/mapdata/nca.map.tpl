@@ -16,12 +16,12 @@ MAP
 
   LAYER
     NAME "mask"
-    DATA "tl_2014_us_state.shp"
+    DATA "../boundaries/CONUS_4326.shp"
     STATUS OFF
     TYPE POLYGON
     CLASS
       STYLE
-        COLOR 0 0 0
+        COLOR 255 255 255
       END
     END
   END
@@ -30,7 +30,7 @@ MAP
 
   LAYER
     NAME "states"
-    DATA "tl_2014_us_state.shp"
+    DATA "../boundaries/CONUS_4326.shp"
     STATUS ON
     TYPE POLYGON
     CLASS

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import json, os, csv, glob, subprocess
+import json, os, csv, glob, subprocess, shutil
 from osgeo import ogr
 
 ##
@@ -9,17 +9,16 @@ def mkdir(path):
     if not os.path.exists(path):
         os.makedirs(path);
 
-def correct_meridian(base, path):
-    output_path = '{0}/temp/{0}.csv'.format(base)
-
-    # TODO auto populate fieldnames
-    fields = ['Zonal_Dir','LON','Merdian_Dir','LAT','P2021_2050','Stat_sig_50','P2041_2070','Stat_sig_70','P2070_2099','Stat_sig_99']
-    with open(output_path, 'wt') as file_out:
-        with open(path, 'rb') as file_in:
-            reader = csv.DictReader(file_in, fieldnames=fields)
-            writer = csv.DictWriter(file_out, fieldnames=fields)
+def correct_meridian(input_csv, output_csv):
+    with open(input_csv, 'rb') as file_in:
+        with open(output_csv, 'wt') as file_out:
+            # auto-populate headers based on the first row of the CSV input
+            reader = csv.DictReader(file_in, fieldnames=[], restkey='undefined-fieldnames')
+            reader.fieldnames = reader.next()['undefined-fieldnames']
+            writer = csv.DictWriter(file_out, fieldnames=reader.fieldnames)
             writer.writeheader()
-            reader.next()
+
+            # iterate and correct remaining rows
             for row in reader:
                 lon = float(row['LON'])
                 if lon >= 180:
@@ -51,16 +50,18 @@ def write_vrt(base, fields):
 
     return output_path
 
-def extract_extents(features_dir, vrt_path):
+def get_extent(layer):
+    driver = ogr.GetDriverByName('ESRI Shapefile')
+    data_source = driver.Open(layer, 0)
+    layer = data_source.GetLayer()
+    return layer.GetExtent()
+
+def extract_boundary_points(features_dir, vrt_path):
     outfiles = []
     features_files = glob.glob('%s*.shp' % features_dir)
-    driver = ogr.GetDriverByName('ESRI Shapefile')
-    for features_file in features_files:
-        data_source = driver.Open(features_file, 0)
-        layer = data_source.GetLayer()
-        extent = layer.GetExtent()
 
-        print extent
+    for features_file in features_files:
+        extent = get_extent(features_file)
 
         fportion = os.path.splitext(os.path.basename(features_file))[0]
         out_file = '%s__%s.shp' % (os.path.splitext(vrt_path)[0], fportion)
@@ -76,7 +77,7 @@ def extract_extents(features_dir, vrt_path):
             str(extent[3]),
             out_file,
             vrt_path
-        ])
+        ], stdout=open(os.devnull, 'wb')) #, stderr=open(os.devnull, 'wb')
 
     return outfiles
 
@@ -101,7 +102,7 @@ def generate_rasters(base, outfiles, fields, xres, yres):
                 out_file
             ]
             
-            subprocess.call(args)
+            subprocess.call(args) #, stdout=open(os.devnull, 'wb')
     return out_rasters
 
 def build_mapfile(base, template, outfiles):
@@ -136,8 +137,11 @@ def render_images(base, mapfile, out_rasters):
         render_file = '%s%s.png' % (output_base, out_name)
         
         bbox=str('-125.16,24.42,-66,49.53.5')
+        #bbox=str('-2235805.8,-1693186.6,2126321.7,1328674.6')
 
         query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:4326&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
+
+        #query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:9822&UNITS=m&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
 
         os.putenv('REQUEST_METHOD', 'GET')
         os.putenv('QUERY_STRING', query_string)
@@ -157,7 +161,7 @@ config = json.load(config_file)
 config_file.close()
 
 # make output structure
-base = os.path.splitext(config['source']['path'])[0]
+base = os.path.splitext(os.path.basename(config['source']['path']))[0]
 temp_dir = os.path.join(base, 'temp')
 data_dir = os.path.join(base, 'data')
 renders_dir = os.path.join(base, 'renders')
@@ -168,14 +172,18 @@ mkdir(data_dir)
 mkdir(renders_dir)
 
 # correct meridian
+csv_dest = os.path.join(base, 'temp', '%s.csv' % base)
 if config['source']['0_360']:
-    correct_meridian(base, config['source']['path'])
+    correct_meridian(config['source']['path'], csv_dest)
+else:
+    shutil.copyfile(config['source']['path'], csv_dest)
 
+'''
 # generate vrt
 vrt_path = write_vrt(base, config['source']['fields'])
 
 # write out all extent shapefiles
-out_shps = extract_extents(config['features_dir'], vrt_path)
+out_shps = extract_boundary_points(config['features_dir'], vrt_path)
 
 # create rasters for each extent shapefile
 out_rasters = generate_rasters(base, out_shps, config['source']['fields'], config['source']['xres'], config['source']['yres'])
@@ -183,3 +191,4 @@ out_rasters = generate_rasters(base, out_shps, config['source']['fields'], confi
 mapfile = build_mapfile(base, config['map_template'], out_rasters)
 
 render_images(base, mapfile, out_rasters)
+'''
