@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import json, os, csv, glob, subprocess, shutil 
-from itertools import product
-from osgeo import ogr
+from osgeo import ogr, osr
 
 ##
 ## Functions
@@ -124,7 +123,7 @@ def extract_boundary_points(boundaries, vrt_path):
             str(boundary['extent'][3]),
             boundary['points_file'],
             vrt_path
-        ], stdout=open(os.devnull, 'wb')) #, stderr=open(os.devnull, 'wb')
+        ], stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'))
 
 def generate_rasters(geo_files, xres, yres):
     for geo_file in geo_files:
@@ -142,19 +141,22 @@ def generate_rasters(geo_files, xres, yres):
                 raster['grid_file']
             ]
             
-            subprocess.call(args) #, stdout=open(os.devnull, 'wb')
+            subprocess.call(args, stdout=open(os.devnull, 'wb'))
 
 def build_mapfile(geo_files, template_map, output_map):
     mask_base = '''
   LAYER
     NAME "%s_mask"
     DATA "%s"
-    STATUS OFF
     TYPE POLYGON
+    STATUS OFF
     CLASS
       STYLE
         COLOR 255 255 255
       END
+    END
+    PROJECTION
+      "init=epsg:4326"
     END
   END
 '''
@@ -163,8 +165,13 @@ def build_mapfile(geo_files, template_map, output_map):
   LAYER
     NAME "%s"
     DATA "%s"
+    TYPE RASTER
+    STATUS ON
     INCLUDE "classes.cmap"
     MASK "%s_mask"
+    PROJECTION
+      "init=epsg:4326"
+    END
   END
 '''
 
@@ -198,13 +205,58 @@ def image_scale(extent, render_max):
 
     return image_width_height
 
+def project_bbox(in_bbox):
+    # transformation details
+    in_ref = osr.SpatialReference()
+    in_ref.ImportFromEPSG(4326)
+
+    out_ref = osr.SpatialReference()
+    out_ref.ImportFromEPSG(5070)
+    '''
+    out_ref.ImportFromWkt(
+PROJCS["North_America_Albers_Equal_Area_Conic",
+    GEOGCS["GCS_North_American_1983",
+        DATUM["North_American_Datum_1983",
+            SPHEROID["GRS_1980",6378137.0,298.257222101]],
+        PRIMEM["Greenwich",0.0],
+        UNIT["Degree",0.0174532925199433]],
+    PROJECTION["Albers_Conic_Equal_Area"],
+    PARAMETER["False_Easting",0.0],
+    PARAMETER["False_Northing",0.0],
+    PARAMETER["longitude_of_center",-96.0],
+    PARAMETER["Standard_Parallel_1",20.0],
+    PARAMETER["Standard_Parallel_2",60.0],
+    PARAMETER["latitude_of_center",40.0],
+    UNIT["Meter",1.0]]
+)'''
+
+    xform = osr.CoordinateTransformation(in_ref, out_ref)
+
+    # input points to transform
+    min_point = ogr.Geometry(ogr.wkbPoint)
+    min_point.AddPoint(in_bbox[0], in_bbox[1])
+
+    max_point = ogr.Geometry(ogr.wkbPoint)
+    max_point.AddPoint(in_bbox[2], in_bbox[3])
+
+    # apply transformation
+    min_point.Transform(xform)
+    max_point.Transform(xform)
+
+    return [
+        min_point.GetX(),
+        min_point.GetY(),
+        max_point.GetX(),
+        max_point.GetY()
+    ]
+
 def render_images(mapfile, geo_files, render_max):
     os.putenv('REQUEST_METHOD', 'GET')
     for geo_file in geo_files:
+        #projected_extent = project_bbox(geo_file['extent'])
         bbox = ','.join(map(str,geo_file['extent']))
+        #bbox = ','.join(map(str,projected_extent))
         image_dimensions = image_scale(geo_file['extent'], render_max)
-        #bbox=str('-2235805.8,-1693186.6,2126321.7,1328674.6')
-        #query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:9822&UNITS=m&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
         for raster in geo_file['rasters']:
             query_string = ('TRANSPARENT=true&'
                             'SERVICE=WMS&'
@@ -212,7 +264,8 @@ def render_images(mapfile, geo_files, render_max):
                             'REQUEST=GetMap&'
                             'STYLES=&'
                             'FORMAT=image/png&'
-                            'SRS=EPSG:4326&'
+                            'SRS=epsg:5070&'
+                            #'SRS=epsg:4326&'
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
@@ -223,6 +276,8 @@ def render_images(mapfile, geo_files, render_max):
                                          geo_file['boundary_file_name'], 
                                          raster['grid_layer_name'], 
                                          bbox))
+
+            #print query_string
             os.putenv('QUERY_STRING', query_string)
 
             p1 = subprocess.Popen(['./mapserv-6.4.1-CentOS-7.exe'], stdout=subprocess.PIPE)
@@ -242,7 +297,7 @@ base_name = os.path.splitext(os.path.basename(config['source']['path']))[0]
 
 # create full intended output
 output_files_map = map_output_files(base_name, config['features_dir'], config['source']['fields'], config['map_template'])
-'''
+
 # make output structure
 for outdir in output_files_map['dirs'].values():
     mkdir(outdir)
@@ -263,6 +318,6 @@ extract_boundary_points(output_files_map['geo_files'], output_files_map['vrt'])
 generate_rasters(output_files_map['geo_files'].values(), config['source']['xres'], config['source']['yres'])
 
 build_mapfile(output_files_map['geo_files'].values(), config['map_template'], output_files_map['map_file'])
-'''
+
 render_images(output_files_map['map_file'], output_files_map['geo_files'].values(), config['render_max'])
 

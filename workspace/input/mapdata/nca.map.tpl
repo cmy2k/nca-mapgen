@@ -1,12 +1,14 @@
 MAP
+  CONFIG "PROJ_LIB" "/home/jmhicks/nca-mapgen/workspace/proj"
   NAME "NCA"
-  EXTENT -180 -90 180 90
-
-  IMAGETYPE PNG24
-
   PROJECTION
+    #"init=epsg:5070"
     "init=epsg:4326"
   END
+  #UNITS meters
+  UNITS dd
+
+  IMAGETYPE PNG24
 
   WEB
     METADATA
@@ -19,14 +21,17 @@ MAP
   LAYER
     NAME "states"
     DATA "../boundaries/CONUS_4326.shp"
-    STATUS ON
     TYPE POLYGON
+    STATUS ON
     CLASS
       STYLE
         OUTLINECOLOR 0 0 0
 	WIDTH 1
 	ANTIALIAS TRUE
       END
+    END
+    PROJECTION
+	"init=epsg:4326"
     END
   END
 END
