@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import json, os, csv, glob, subprocess, shutil 
-from osgeo import ogr, osr
+from osgeo import ogr, osr, gdal
 
 ##
 ## Functions
@@ -63,11 +63,16 @@ def map_output_files(base, features_dir, fields, map_template):
 
         for field in fields:
             raster_layer_name = '%s__%s' % (base_boundary_portion, field['data'])
+            stat_layer_name = '%s__%s' % (base_boundary_portion, field['stat'])
             output_map['geo_files'][boundary_name]['rasters'].append({
                 'field': field['data'],
                 'grid_layer_name': raster_layer_name,
                 'grid_file': os.path.join(output_map['dirs']['data'], '%s.tif' % raster_layer_name),
                 'render_file': os.path.join(output_map['dirs']['renders'], '%s.png' % raster_layer_name),
+                'stat_field': field['stat'],
+                'stat_layer_name': stat_layer_name,
+                'stat_grid': os.path.join(output_map['dirs']['temp'], '%s.tif' % stat_layer_name),
+                'stat_shp': os.path.join(output_map['dirs']['data'], '%s.shp' % stat_layer_name),
             })
 
     return output_map
@@ -90,11 +95,13 @@ def write_corrected_csv(input_csv, output_csv):
                 writer.writerow(row)
 
 def write_vrt(base, fields, vrt_path):
-    field_template = '    <Field name="{0}" src="{0}" type="Real" />'
+    data_template = '    <Field name="{0}" src="{0}" type="Real" />'
+    stat_template = '    <Field name="{0}" src="{0}" type="String" />'
     field_arr = []
 
     for field in fields:
-        field_arr.append(field_template.format(field['data']))
+        field_arr.append(data_template.format(field['data']))
+        field_arr.append(stat_template.format(field['stat']))
 
     vrt = '''
 <OGRVRTDataSource>
@@ -125,25 +132,57 @@ def extract_boundary_points(boundaries, vrt_path):
             vrt_path
         ], stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb'))
 
+def generate_raster(xres, yres, points_layer, field, points_file, output):
+    args = [
+        'gdal_rasterize',
+        '-tr',
+        str(xres),
+        str(yres),
+        '-l',
+        points_layer,
+        '-a',
+        field,
+        points_file,
+        output
+    ]
+            
+    subprocess.call(args)#, stdout=open(os.devnull, 'wb')
+
 def generate_rasters(geo_files, xres, yres):
     for geo_file in geo_files:
         for raster in geo_file['rasters']:
-            args = [
-                'gdal_rasterize',
-                '-tr',
-                str(xres),
-                str(yres),
-                '-l',
-                geo_file['points_layer_name'],
-                '-a',
-                raster['field'],
-                geo_file['points_file'],
-                raster['grid_file']
-            ]
-            
-            subprocess.call(args, stdout=open(os.devnull, 'wb'))
+            #main raster
+            generate_raster(xres, 
+                            yres, 
+                            geo_file['points_layer_name'], 
+                            raster['field'], 
+                            geo_file['points_file'], 
+                            raster['grid_file'])
+            generate_raster(xres, 
+                            yres, 
+                            geo_file['points_layer_name'], 
+                            raster['stat_field'][:-1], #for some reason, the shapefile conversion truncates the field name
+                            geo_file['points_file'], 
+                            raster['stat_grid'])
+
+def polygonize_stats(geo_files):
+    for geo_file in geo_files:
+        for raster in geo_file['rasters']:
+            print raster['stat_grid']
+            grid = gdal.Open(raster['stat_grid'])
+            band = grid.GetRasterBand(1)
+            driver = ogr.GetDriverByName('ESRI Shapefile')
+            outshp = driver.CreateDataSource(raster['stat_shp'])
+            ref = osr.SpatialReference()
+            ref.ImportFromEPSG(4326)
+            outlr = outshp.CreateLayer('poly', srs = ref)
+            gdal.Polygonize(band, None, outlr, -1, [], callback=None)
 
 def build_mapfile(geo_files, template_map, output_map):
+#####
+##### TODO: add stat layer as an overlay
+#####
+
     mask_base = '''
   LAYER
     NAME "%s_mask"
@@ -264,8 +303,8 @@ def render_images(mapfile, geo_files, render_max):
                             'REQUEST=GetMap&'
                             'STYLES=&'
                             'FORMAT=image/png&'
-                            'SRS=epsg:5070&'
-                            #'SRS=epsg:4326&'
+                            #'SRS=epsg:5070&'
+                            'SRS=epsg:4326&'
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
@@ -316,6 +355,8 @@ extract_boundary_points(output_files_map['geo_files'], output_files_map['vrt'])
 
 # create rasters for each extent shapefile
 generate_rasters(output_files_map['geo_files'].values(), config['source']['xres'], config['source']['yres'])
+
+polygonize_stats(output_files_map['geo_files'].values())
 
 build_mapfile(output_files_map['geo_files'].values(), config['map_template'], output_files_map['map_file'])
 
