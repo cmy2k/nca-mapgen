@@ -181,14 +181,48 @@ def build_mapfile(geo_files, template_map, output_map):
             replaced = file_in.read().replace('$$LAYERS$$', ''.join(layers))
             file_out.write(replaced)
 
-def render_images(mapfile, geo_files):
+def image_scale(extent, render_max):
+    extent_width = extent[2] - extent[0]
+    extent_height = extent[3] - extent[1]
+    
+    image_width = image_height = render_max
+    if extent_width > extent_height:
+        image_height = extent_height / extent_width * render_max
+    else:
+        image_width = extent_width / extent_height * render_max
+
+    image_width_height = {
+        'width': image_width, 
+        'height': image_height
+    }
+
+    return image_width_height
+
+def render_images(mapfile, geo_files, render_max):
     os.putenv('REQUEST_METHOD', 'GET')
     for geo_file in geo_files:
         bbox = ','.join(map(str,geo_file['extent']))
+        image_dimensions = image_scale(geo_file['extent'], render_max)
         #bbox=str('-2235805.8,-1693186.6,2126321.7,1328674.6')
         #query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:9822&UNITS=m&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=mask,%s,states&BBOX=%s' % (mapfile, out_name, bbox)
         for raster in geo_file['rasters']:
-            query_string = 'TRANSPARENT=true&SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&STYLES=&FORMAT=image/png&SRS=EPSG:4326&WIDTH=800&HEIGHT=400&MAP=%s&LAYERS=%s_mask,%s,states&BBOX=%s' % (mapfile, geo_file['boundary_file_name'], raster['grid_layer_name'], bbox)
+            query_string = ('TRANSPARENT=true&'
+                            'SERVICE=WMS&'
+                            'VERSION=1.1.1&'
+                            'REQUEST=GetMap&'
+                            'STYLES=&'
+                            'FORMAT=image/png&'
+                            'SRS=EPSG:4326&'
+                            'WIDTH=%s&'
+                            'HEIGHT=%s&'
+                            'MAP=%s&'
+                            'LAYERS=%s_mask,%s,states&'
+                            'BBOX=%s' % (image_dimensions['width'], 
+                                         image_dimensions['height'], 
+                                         mapfile, 
+                                         geo_file['boundary_file_name'], 
+                                         raster['grid_layer_name'], 
+                                         bbox))
             os.putenv('QUERY_STRING', query_string)
 
             p1 = subprocess.Popen(['./mapserv-6.4.1-CentOS-7.exe'], stdout=subprocess.PIPE)
@@ -208,7 +242,7 @@ base_name = os.path.splitext(os.path.basename(config['source']['path']))[0]
 
 # create full intended output
 output_files_map = map_output_files(base_name, config['features_dir'], config['source']['fields'], config['map_template'])
-
+'''
 # make output structure
 for outdir in output_files_map['dirs'].values():
     mkdir(outdir)
@@ -229,6 +263,6 @@ extract_boundary_points(output_files_map['geo_files'], output_files_map['vrt'])
 generate_rasters(output_files_map['geo_files'].values(), config['source']['xres'], config['source']['yres'])
 
 build_mapfile(output_files_map['geo_files'].values(), config['map_template'], output_files_map['map_file'])
-
-render_images(output_files_map['map_file'], output_files_map['geo_files'].values())
+'''
+render_images(output_files_map['map_file'], output_files_map['geo_files'].values(), config['render_max'])
 
