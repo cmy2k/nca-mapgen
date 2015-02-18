@@ -146,7 +146,7 @@ def generate_raster(xres, yres, points_layer, field, points_file, output):
         output
     ]
             
-    subprocess.call(args)#, stdout=open(os.devnull, 'wb')
+    subprocess.call(args, stdout=open(os.devnull, 'wb'))
 
 def generate_rasters(geo_files, xres, yres):
     for geo_file in geo_files:
@@ -168,10 +168,11 @@ def generate_rasters(geo_files, xres, yres):
 def polygonize_stats(geo_files):
     for geo_file in geo_files:
         for raster in geo_file['rasters']:
-            print raster['stat_grid']
             grid = gdal.Open(raster['stat_grid'])
             band = grid.GetRasterBand(1)
             driver = ogr.GetDriverByName('ESRI Shapefile')
+            if os.path.exists(raster['stat_shp']):
+                driver.DeleteDataSource(raster['stat_shp'])
             outshp = driver.CreateDataSource(raster['stat_shp'])
             ref = osr.SpatialReference()
             ref.ImportFromEPSG(4326)
@@ -179,10 +180,6 @@ def polygonize_stats(geo_files):
             gdal.Polygonize(band, None, outlr, -1, [], callback=None)
 
 def build_mapfile(geo_files, template_map, output_map):
-#####
-##### TODO: add stat layer as an overlay
-#####
-
     mask_base = '''
   LAYER
     NAME "%s_mask"
@@ -212,6 +209,32 @@ def build_mapfile(geo_files, template_map, output_map):
       "init=epsg:4326"
     END
   END
+  LAYER
+    NAME "%s"
+    DATA "%s"
+    TYPE POLYGON
+    STATUS ON
+    CLASS
+      EXPRESSION ([FID] = 3)
+      STYLE
+        SYMBOL "hatch"
+        COLOR 176 176 176
+        ANGLE 45
+        SIZE 4
+        WIDTH 1
+      END
+    END
+    CLASS
+      EXPRESSION ([FID] = 2)
+      STYLE
+        COLOR 255 255 255
+      END
+    END
+    MASK "%s_mask"
+    PROJECTION
+      "init=epsg:4326"
+    END
+  END
 '''
 
     layers = []
@@ -220,7 +243,14 @@ def build_mapfile(geo_files, template_map, output_map):
         layers.append(mask_base % (mask_name, os.path.abspath(geo_file['boundary_file'])))
         
         for raster in geo_file['rasters']:
-            layers.append(layer_base % (raster['grid_layer_name'], os.path.abspath(raster['grid_file']), mask_name))
+            layers.append(
+                layer_base % (
+                    raster['grid_layer_name'], 
+                    os.path.abspath(raster['grid_file']), 
+                    mask_name,
+                    raster['stat_layer_name'],
+                    os.path.abspath(raster['stat_shp']),
+                    mask_name))
 
     with open(output_map, 'wt') as file_out:
         with open(template_map, 'rb') as file_in:
@@ -308,12 +338,13 @@ def render_images(mapfile, geo_files, render_max):
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
-                            'LAYERS=%s_mask,%s,states&'
+                            'LAYERS=%s_mask,%s,%s,states&'
                             'BBOX=%s' % (image_dimensions['width'], 
                                          image_dimensions['height'], 
                                          mapfile, 
                                          geo_file['boundary_file_name'], 
-                                         raster['grid_layer_name'], 
+                                         raster['grid_layer_name'],
+                                         raster['stat_layer_name'],
                                          bbox))
 
             #print query_string
