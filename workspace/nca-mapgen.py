@@ -12,13 +12,28 @@ def mkdir(path):
 def filename(base, dr, ext):
     return os.path.join(base, dr, '%s.%s' % (base, ext))
 
-def get_extent(layer):
+def get_extent(layer, xres, yres):
     driver = ogr.GetDriverByName('ESRI Shapefile')
     data_source = driver.Open(layer, 0)
     layer = data_source.GetLayer()
     extent = list(layer.GetExtent())
     # correct coordinate bbox coordinate order to conform with the rest of everything
     extent[2], extent[1] = extent[1], extent[2]
+    extent = widen_extent(extent, xres, yres)
+    return extent
+
+# widens the extent by one resolution unit to make sure we
+# get data that will fully encapsulate the area
+def widen_extent(extent, xres, yres):
+    # left-most x-coordinate
+    extent[0] = extent[0] - xres
+    # bottom-most y-coordinate
+    extent[1] = extent[1] - yres
+    # right-most x-coordinate
+    extent[2] = extent[2] + xres
+    # top-most y-coordinate
+    extent[3] = extent[3] + yres
+
     return extent
 
 # This funciton goes ahead and figures out all the 
@@ -31,7 +46,7 @@ def get_extent(layer):
 #     the various rasters it is associated with) can
 #     be grouped much more simply, even if they are
 #     generated in several places
-def map_output_files(base, features_dir, fields, map_template):
+def map_output_files(base, features_dir, fields, map_template, xres, yres):
     output_map = {
         'dirs': {
             'base': base,
@@ -57,7 +72,7 @@ def map_output_files(base, features_dir, fields, map_template):
             'boundary_file_name': boundary_name,
             'points_file': os.path.join(output_map['dirs']['temp'], '%s.shp' % base_boundary_portion),
             'points_layer_name': base_boundary_portion,
-            'extent': get_extent(boundary_file),
+            'extent': get_extent(boundary_file, xres, yres),
             'rasters': []
         }
 
@@ -177,7 +192,8 @@ def polygonize_stats(geo_files):
             ref = osr.SpatialReference()
             ref.ImportFromEPSG(4326)
             outlr = outshp.CreateLayer('poly', srs = ref)
-            gdal.Polygonize(band, None, outlr, -1, [], callback=None)
+            outlr.CreateField(ogr.FieldDefn('sig', ogr.OFTInteger))
+            gdal.Polygonize(band, None, outlr, 0, [], callback=None)
 
 def build_mapfile(geo_files, template_map, output_map):
     mask_base = '''
@@ -189,6 +205,25 @@ def build_mapfile(geo_files, template_map, output_map):
     CLASS
       STYLE
         COLOR 255 255 255
+      END
+    END
+    PROJECTION
+      "init=epsg:4326"
+    END
+  END
+'''
+
+    boundary_base = '''
+  LAYER
+    NAME "%s_boundary"
+    DATA "%s"
+    TYPE POLYGON
+    STATUS ON
+    CLASS
+      STYLE
+        OUTLINECOLOR 0 0 0
+        WIDTH 1
+        ANTIALIAS TRUE
       END
     END
     PROJECTION
@@ -215,17 +250,17 @@ def build_mapfile(geo_files, template_map, output_map):
     TYPE POLYGON
     STATUS ON
     CLASS
-      EXPRESSION ([FID] = 3)
+      EXPRESSION ([sig] = 3)
       STYLE
         SYMBOL "hatch"
-        COLOR 176 176 176
+        COLOR 0 0 0
         ANGLE 45
-        SIZE 4
-        WIDTH 1
+        SIZE 8
+        WIDTH 0.75
       END
     END
     CLASS
-      EXPRESSION ([FID] = 2)
+      EXPRESSION ([sig] = 2)
       STYLE
         COLOR 255 255 255
       END
@@ -241,6 +276,7 @@ def build_mapfile(geo_files, template_map, output_map):
     for geo_file in geo_files:
         mask_name = geo_file['boundary_file_name']
         layers.append(mask_base % (mask_name, os.path.abspath(geo_file['boundary_file'])))
+        layers.append(boundary_base % (mask_name, os.path.abspath(geo_file['boundary_file'])))
         
         for raster in geo_file['rasters']:
             layers.append(
@@ -338,15 +374,17 @@ def render_images(mapfile, geo_files, render_max):
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
-                            'LAYERS=%s_mask,%s,%s,states&'
+                            'LAYERS=%s_mask,%s,%s,%s_boundary&'
                             'BBOX=%s' % (image_dimensions['width'], 
                                          image_dimensions['height'], 
                                          mapfile, 
-                                         geo_file['boundary_file_name'], 
+                                         geo_file['boundary_file_name'],
                                          raster['grid_layer_name'],
                                          raster['stat_layer_name'],
+                                         geo_file['boundary_file_name'],
                                          bbox))
 
+            #
             #print query_string
             os.putenv('QUERY_STRING', query_string)
 
@@ -365,8 +403,8 @@ config_file.close()
 
 base_name = os.path.splitext(os.path.basename(config['source']['path']))[0]
 
-# create full intended output
-output_files_map = map_output_files(base_name, config['features_dir'], config['source']['fields'], config['map_template'])
+# create full intended output listing
+output_files_map = map_output_files(base_name, config['features_dir'], config['source']['fields'], config['map_template'], config['source']['xres'], config['source']['yres'])
 
 # make output structure
 for outdir in output_files_map['dirs'].values():
@@ -392,4 +430,3 @@ polygonize_stats(output_files_map['geo_files'].values())
 build_mapfile(output_files_map['geo_files'].values(), config['map_template'], output_files_map['map_file'])
 
 render_images(output_files_map['map_file'], output_files_map['geo_files'].values(), config['render_max'])
-

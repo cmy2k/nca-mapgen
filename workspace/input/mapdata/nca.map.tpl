@@ -23,21 +23,5 @@ MAP
 
   $$LAYERS$$
 
-  LAYER
-    NAME "states"
-    DATA "../boundaries/CONUS_4326.shp"
-    TYPE POLYGON
-    STATUS ON
-    CLASS
-      STYLE
-        OUTLINECOLOR 0 0 0
-	WIDTH 1
-	ANTIALIAS TRUE
-      END
-    END
-    PROJECTION
-	"init=epsg:4326"
-    END
-  END
 END
   
