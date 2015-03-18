@@ -376,7 +376,7 @@ def render_images(mapfile, geo_files, render_max):
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
-                            'SLD=file:///home/jmhicks/nca-mapgen/workspace/discrete.sld&'
+                            'SLD=http://nca-mapgen.nemac.org/discrete.xml&'
                             'LAYERS=%s_mask,%s,%s,%s_boundary&'
                             'BBOX=%s' % (image_dimensions['width'], 
                                          image_dimensions['height'], 
