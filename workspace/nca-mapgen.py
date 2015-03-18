@@ -222,7 +222,7 @@ def build_mapfile(geo_files, template_map, output_map):
     CLASS
       STYLE
         OUTLINECOLOR 0 0 0
-        WIDTH 1
+        WIDTH 3
         ANTIALIAS TRUE
       END
     END
@@ -236,8 +236,10 @@ def build_mapfile(geo_files, template_map, output_map):
   LAYER
     NAME "%s"
     DATA "%s"
-    TYPE RASTER
     STATUS ON
+    TYPE RASTER
+    PROCESSING "RESAMPLE=BILINEAR"
+    PROCESSING "COLOR_MATCH_THRESHOLD=1"
     INCLUDE "classes.cmap"
     MASK "%s_mask"
     PROJECTION
@@ -374,6 +376,7 @@ def render_images(mapfile, geo_files, render_max):
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
+                            'SLD=file:///home/jmhicks/nca-mapgen/workspace/discrete.sld&'
                             'LAYERS=%s_mask,%s,%s,%s_boundary&'
                             'BBOX=%s' % (image_dimensions['width'], 
                                          image_dimensions['height'], 

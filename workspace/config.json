@@ -19,5 +19,5 @@
   },
   "features_dir": "input/boundaries/",
   "map_template": "input/mapdata/nca.map.tpl",
-  "render_max": 600
+  "render_max": 1800
 }

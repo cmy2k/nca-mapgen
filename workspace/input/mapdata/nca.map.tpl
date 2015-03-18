@@ -8,7 +8,7 @@ MAP
   #UNITS meters
   UNITS dd
 
-  IMAGETYPE PNG24
+  #IMAGETYPE PNG24
 
   WEB
     METADATA
