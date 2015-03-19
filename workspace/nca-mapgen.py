@@ -84,6 +84,7 @@ def map_output_files(base, features_dir, fields, map_template, xres, yres):
                 'grid_layer_name': raster_layer_name,
                 'grid_file': os.path.join(output_map['dirs']['data'], '%s.tif' % raster_layer_name),
                 'render_file': os.path.join(output_map['dirs']['renders'], '%s.png' % raster_layer_name),
+                'interpolation_file': os.path.join(output_map['dirs']['data'], '%s_interpolation.tif' % raster_layer_name),
                 'stat_field': field['stat'],
                 'stat_layer_name': stat_layer_name,
                 'stat_grid': os.path.join(output_map['dirs']['temp'], '%s.tif' % stat_layer_name),
@@ -180,6 +181,25 @@ def generate_rasters(geo_files, xres, yres):
                             geo_file['points_file'], 
                             raster['stat_grid'])
 
+def interpolate_rasters(geo_files):
+    for geo_file in geo_files:
+        for raster in geo_file['rasters']:
+            args = [
+                'gdalwarp',
+                '-overwrite',
+                '-r',
+                'bilinear',
+                '-ts',
+                '2000',
+                '2000',
+                '-of',
+                'GTiff',
+                raster['grid_file'],
+                raster['interpolation_file']
+            ]
+
+            subprocess.call(args, stdout=open(os.devnull, 'wb'))
+
 def polygonize_stats(geo_files):
     for geo_file in geo_files:
         for raster in geo_file['rasters']:
@@ -238,8 +258,6 @@ def build_mapfile(geo_files, template_map, output_map):
     DATA "%s"
     STATUS ON
     TYPE RASTER
-    PROCESSING "RESAMPLE=BILINEAR"
-    PROCESSING "COLOR_MATCH_THRESHOLD=1"
     INCLUDE "classes.cmap"
     MASK "%s_mask"
     PROJECTION
@@ -283,8 +301,8 @@ def build_mapfile(geo_files, template_map, output_map):
         for raster in geo_file['rasters']:
             layers.append(
                 layer_base % (
-                    raster['grid_layer_name'], 
-                    os.path.abspath(raster['grid_file']), 
+                    raster['grid_layer_name'],
+                    os.path.abspath(raster['interpolation_file']), 
                     mask_name,
                     raster['stat_layer_name'],
                     os.path.abspath(raster['stat_shp']),
@@ -427,6 +445,8 @@ extract_boundary_points(output_files_map['geo_files'], output_files_map['vrt'])
 
 # create rasters for each extent shapefile
 generate_rasters(output_files_map['geo_files'].values(), config['source']['xres'], config['source']['yres'])
+
+interpolate_rasters(output_files_map['geo_files'].values())
 
 polygonize_stats(output_files_map['geo_files'].values())
 
