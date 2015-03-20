@@ -303,6 +303,7 @@ def build_mapfile(geo_files, template_map, output_map):
                 layer_base % (
                     raster['grid_layer_name'],
                     os.path.abspath(raster['interpolation_file']), 
+                    #os.path.abspath(raster['grid_file']), 
                     mask_name,
                     raster['stat_layer_name'],
                     os.path.abspath(raster['stat_shp']),
