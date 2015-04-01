@@ -1,6 +1,8 @@
 *~
 .DS_STORE
+workspace/input/*.csv
 workspace/input/newdata/
 workspace/input/olddata/
+workspace/input/boundaries/
 *.exe
 *_bak

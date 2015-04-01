@@ -275,7 +275,7 @@ def build_mapfile(geo_files, template_map, output_map):
         SYMBOL "hatch"
         COLOR 0 0 0
         ANGLE 45
-        SIZE 8
+        SIZE 25
         WIDTH 0.75
       END
     END
