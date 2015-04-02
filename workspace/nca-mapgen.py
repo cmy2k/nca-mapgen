@@ -7,7 +7,7 @@ from osgeo import ogr, osr, gdal
 ##
 def mkdir(path):
     if not os.path.exists(path):
-        os.makedirs(path);
+        os.makedirs(path)
 
 def filename(base, dr, ext):
     return os.path.join(base, dr, '%s.%s' % (base, ext))
@@ -19,22 +19,37 @@ def get_extent(layer, xres, yres):
     extent = list(layer.GetExtent())
     # correct coordinate bbox coordinate order to conform with the rest of everything
     extent[2], extent[1] = extent[1], extent[2]
-    extent = widen_extent(extent, xres, yres)
     return extent
 
 # widens the extent by one resolution unit to make sure we
 # get data that will fully encapsulate the area
 def widen_extent(extent, xres, yres):
+    new_extent = []
     # left-most x-coordinate
-    extent[0] = extent[0] - xres
+    new_extent.append(extent[0] - xres)
     # bottom-most y-coordinate
-    extent[1] = extent[1] - yres
+    new_extent.append(extent[1] - yres)
     # right-most x-coordinate
-    extent[2] = extent[2] + xres
+    new_extent.append(extent[2] + xres)
     # top-most y-coordinate
-    extent[3] = extent[3] + yres
+    new_extent.append(extent[3] + yres)
 
-    return extent
+    return new_extent
+
+# slightly widen the extent to make sure lines aren't clipped
+def widen_extent_by_factor(extent, factor):
+    new_extent = []
+    # left-most x-coordinate
+    new_extent.append(extent[0] * (1 + factor))
+    # bottom-most y-coordinate
+    new_extent.append(extent[1] * (1 - factor))
+    # right-most x-coordinate
+    new_extent.append(extent[2] * (1 - factor))
+    # top-most y-coordinate
+    new_extent.append(extent[3] * (1 + factor))
+
+    return new_extent
+
 
 # This funciton goes ahead and figures out all the 
 # file output details in one place. Some advantages
@@ -67,12 +82,17 @@ def map_output_files(base, features_dir, fields, map_template, xres, yres):
         boundary_name = os.path.splitext(os.path.basename(boundary_file))[0]
         base_boundary_portion = '%s__%s' % (base, boundary_name)
 
+        extent = get_extent(boundary_file, xres, yres)
+        render_extent = widen_extent_by_factor(extent, 0.0003)
+        wider_extent = widen_extent(extent, xres, yres)
+
         output_map['geo_files'][boundary_name] = {
             'boundary_file': boundary_file,
             'boundary_file_name': boundary_name,
             'points_file': os.path.join(output_map['dirs']['temp'], '%s.shp' % base_boundary_portion),
             'points_layer_name': base_boundary_portion,
-            'extent': get_extent(boundary_file, xres, yres),
+            'render_extent': render_extent,
+            'extent': wider_extent,
             'rasters': []
         }
 
@@ -84,7 +104,7 @@ def map_output_files(base, features_dir, fields, map_template, xres, yres):
                 'grid_layer_name': raster_layer_name,
                 'grid_file': os.path.join(output_map['dirs']['data'], '%s.tif' % raster_layer_name),
                 'render_file': os.path.join(output_map['dirs']['renders'], '%s.png' % raster_layer_name),
-                'interpolation_file': os.path.join(output_map['dirs']['data'], '%s_interpolation.tif' % raster_layer_name),
+                'interpolation_file': os.path.join(output_map['dirs']['temp'], '%s_interpolation.tif' % raster_layer_name),
                 'stat_field': field['stat'],
                 'stat_layer_name': stat_layer_name,
                 'stat_grid': os.path.join(output_map['dirs']['temp'], '%s.tif' % stat_layer_name),
@@ -380,9 +400,9 @@ def render_images(mapfile, geo_files, render_max):
     os.putenv('REQUEST_METHOD', 'GET')
     for geo_file in geo_files:
         #projected_extent = project_bbox(geo_file['extent'])
-        bbox = ','.join(map(str,geo_file['extent']))
+        bbox = ','.join(map(str,geo_file['render_extent']))
         #bbox = ','.join(map(str,projected_extent))
-        image_dimensions = image_scale(geo_file['extent'], render_max)
+        image_dimensions = image_scale(geo_file['render_extent'], render_max)
         for raster in geo_file['rasters']:
             query_string = ('TRANSPARENT=true&'
                             'SERVICE=WMS&'
