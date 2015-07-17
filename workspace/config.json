@@ -1,23 +1,20 @@
 {
   "source": {
-    "path": "input/P_RCP_26.csv",
+    "path": "input/P_RCP_85_Annual__Regional.csv",
     "xres": 1.5,
     "yres": 1.5,
-    "0_360": true,    
+    "0_360": true,
     "fields": [
-    {
-        "data": "P2021_2050",
-        "stat": "Stat_sig_50"
-      }, {
+      {
         "data": "P2041_2070",
         "stat": "Stat_sig_70"
-      }, {
+      },{
         "data": "P2070_2099",
         "stat": "Stat_sig_99"
       }
     ]
   },
-  "features_dir": "input/boundaries/",
+  "features_dir": "input/regional/",
   "map_template": "input/mapdata/nca.map.tpl",
   "render_max": 1800
 }
