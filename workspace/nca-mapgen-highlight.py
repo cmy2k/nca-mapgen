@@ -42,7 +42,7 @@ def widen_extent_by_factor(extent, factor):
     # left-most x-coordinate
     new_extent.append(extent[0] * (1 + factor))
     # bottom-most y-coordinate
-    new_extent.append(extent[1] * (1 - factor))
+    new_extent.append(extent[1] * (1 - 500 * factor))
     # right-most x-coordinate
     new_extent.append(extent[2] * (1 - factor))
     # top-most y-coordinate
@@ -411,30 +411,75 @@ PROJCS["North_America_Albers_Equal_Area_Conic",
 
     xform = osr.CoordinateTransformation(in_ref, out_ref)
 
-    # input points to transform
-    min_point = ogr.Geometry(ogr.wkbPoint)
-    min_point.AddPoint(in_bbox[0], in_bbox[1])
+    minX = in_bbox[0]
+    maxX = in_bbox[2]
+    minY = in_bbox[1]
+    maxY = in_bbox[3]
 
-    max_point = ogr.Geometry(ogr.wkbPoint)
-    max_point.AddPoint(in_bbox[2], in_bbox[3])
+    # input points to transform
+    lower_left = ogr.Geometry(ogr.wkbPoint)
+    lower_left.AddPoint(minX, minY)
+
+    lower_right = ogr.Geometry(ogr.wkbPoint)
+    lower_right.AddPoint(maxX, minY)
+
+    upper_left = ogr.Geometry(ogr.wkbPoint)
+    upper_left.AddPoint(minX, maxY)
+
+    upper_right = ogr.Geometry(ogr.wkbPoint)
+    upper_right.AddPoint(maxX, maxY)
 
     # apply transformation
-    min_point.Transform(xform)
-    max_point.Transform(xform)
+    lower_left.Transform(xform)
+    lower_right.Transform(xform)
+    upper_left.Transform(xform)
+    upper_right.Transform(xform)
+
+    xses = [
+        lower_left.GetX(),
+        lower_right.GetX(),
+        upper_left.GetX(),
+        upper_right.GetX()
+    ]
+
+    newMaxX = xses[0]
+    newMinX = xses[0]
+
+    for x in xses:
+        if x > newMaxX:
+            newMaxX = x
+        if x < newMinX:
+            newMinX = x
+
+    ys = [
+        lower_left.GetY(),
+        lower_right.GetY(),
+        upper_left.GetY(),
+        upper_right.GetY()
+    ]
+
+    newMaxY = ys[0]
+    newMinY = ys[0]
+
+    for y in ys:
+        if y > newMaxY:
+            newMaxY = y
+        if y < newMinY:
+            newMinY = y
 
     return [
-        min_point.GetX(),
-        min_point.GetY(),
-        max_point.GetX(),
-        max_point.GetY()
+        newMinX,
+        newMinY,
+        newMaxX,
+        newMaxY
     ]
 
 def render_images(mapfile, geo_files, render_max):
     os.putenv('REQUEST_METHOD', 'GET')
     for geo_file in geo_files:
-        #projected_extent = project_bbox(geo_file['extent'])
-        bbox = ','.join(map(str,geo_file['render_extent']))
-        #bbox = ','.join(map(str,projected_extent))
+        projected_extent = project_bbox(geo_file['render_extent'])
+        #bbox = ','.join(map(str,geo_file['render_extent']))
+        bbox = ','.join(map(str,projected_extent))
         image_dimensions = image_scale(geo_file['render_extent'], render_max)
 
         if len(geo_file['highlight_files']) > 0:
@@ -453,8 +498,8 @@ def do_render(raster, image_dimensions, mapfile, geo_file, bbox, highlight_name,
                             'REQUEST=GetMap&'
                             'STYLES=&'
                             'FORMAT=image/png&'
-                            #'SRS=epsg:5070&'
-                            'SRS=epsg:4326&'
+                            'SRS=epsg:5070&'
+                            #'SRS=epsg:4326&'
                             'WIDTH=%s&'
                             'HEIGHT=%s&'
                             'MAP=%s&'
